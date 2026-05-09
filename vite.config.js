@@ -5,6 +5,7 @@ export default defineConfig({
   plugins: [react()],
   test: {
     globals: true,
+    include: ['src/**/*.test.{js,jsx,ts,tsx}'],
   },
   server: {
     proxy: {
