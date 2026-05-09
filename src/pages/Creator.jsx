@@ -50,7 +50,7 @@ function StatCard({ label, target, suffix='', sub, trend }) {
 
 
 export default function Creator() {
-  const { user, fetchPhotos, createPhoto, deletePhoto, addToast, logout } = useApp()
+  const { user, fetchPhotos, createPhoto, updatePhoto, deletePhoto, addToast, logout } = useApp()
 
   const [section,    setSection]    = useState('upload')
   const [people,     setPeople]     = useState([])
@@ -64,6 +64,8 @@ export default function Creator() {
   const [stats,          setStats]          = useState(null)
   const [activity,       setActivity]       = useState([])
   const [loadingActivity,setLoadingActivity]= useState(false)
+  const [editingPhoto,   setEditingPhoto]   = useState(null)
+  const [saving,         setSaving]         = useState(false)
   const formRef = useRef(null)
 
   const loadMyPhotos = async () => {
@@ -121,6 +123,28 @@ export default function Creator() {
       addToast('Photo deleted', 'info')
     } catch {
       addToast('Failed to delete photo', 'error')
+    }
+  }
+
+  const handleEditSubmit = async (e) => {
+    e.preventDefault()
+    const fd = new FormData(e.target)
+    const body = {
+      title:    fd.get('title'),
+      caption:  fd.get('caption'),
+      location: fd.get('location'),
+      tags:     fd.get('tags'),
+    }
+    setSaving(true)
+    try {
+      const updated = await updatePhoto(editingPhoto._id, body)
+      setMyPhotos(prev => prev.map(p => p._id === updated._id ? updated : p))
+      setEditingPhoto(null)
+      addToast('Photo updated', 'success')
+    } catch (err) {
+      addToast(err.message || 'Failed to update photo', 'error')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -283,8 +307,8 @@ export default function Creator() {
                     <div key={p._id} className="gallery-item">
                       <img src={p.imageUrl} alt={p.title} loading="lazy" />
                       <div className="gallery-item-overlay">
-                        <button className="card-action-btn" onClick={() => addToast('Edit coming soon', 'info')}>✎</button>
-                        <button className="card-action-btn" onClick={() => handleDelete(p._id)}>🗑</button>
+                        <button className="card-action-btn" title="Edit" onClick={() => setEditingPhoto(p)}>✎</button>
+                        <button className="card-action-btn" title="Delete" onClick={() => handleDelete(p._id)}>🗑</button>
                       </div>
                     </div>
                   ))}
@@ -365,6 +389,48 @@ export default function Creator() {
 
         </main>
       </div>
+
+      {/* ── Edit Photo Modal ──────────────────── */}
+      {editingPhoto && (
+        <div
+          style={{ position:'fixed', inset:0, zIndex:900, background:'rgba(26,25,24,.55)', backdropFilter:'blur(6px)', display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}
+          onClick={() => setEditingPhoto(null)}
+        >
+          <div
+            style={{ background:'var(--surface)', borderRadius:'var(--r4)', width:'100%', maxWidth:480, boxShadow:'var(--s5)', overflow:'hidden' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ padding:'16px 24px', borderBottom:'1px solid var(--border-2)', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+              <span style={{ fontWeight:600, fontSize:16 }}>Edit Photo</span>
+              <button style={{ fontSize:20, color:'var(--text-3)', lineHeight:1, background:'none', border:'none', cursor:'pointer' }} onClick={() => setEditingPhoto(null)}>✕</button>
+            </div>
+            <form onSubmit={handleEditSubmit} style={{ padding:24, display:'flex', flexDirection:'column', gap:16 }}>
+              <div className="form-group">
+                <label>Title <span style={{ color:'var(--rose)' }}>*</span></label>
+                <input name="title" className="form-input" defaultValue={editingPhoto.title} required maxLength={80} />
+              </div>
+              <div className="form-group">
+                <label>Caption</label>
+                <textarea name="caption" className="form-textarea" defaultValue={editingPhoto.caption} maxLength={500} rows={3} />
+              </div>
+              <div className="form-group">
+                <label>Location</label>
+                <input name="location" className="form-input" defaultValue={editingPhoto.location} />
+              </div>
+              <div className="form-group">
+                <label>Tags</label>
+                <input name="tags" className="form-input" defaultValue={editingPhoto.tags?.join(', ')} placeholder="landscape, travel…" />
+              </div>
+              <div style={{ display:'flex', gap:12, marginTop:4 }}>
+                <button type="submit" className="btn btn-gold" style={{ flex:1 }} disabled={saving}>
+                  {saving ? 'Saving…' : 'Save Changes'}
+                </button>
+                <button type="button" className="btn btn-outline" onClick={() => setEditingPhoto(null)}>Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
