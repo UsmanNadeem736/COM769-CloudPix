@@ -63,7 +63,7 @@ export default function Nav({ variant = 'transparent', onSearch, showSearch = fa
                 <div className="avatar" style={{ width:32, height:32 }}>
                   <img src={picsum(user.avatar, 80, 80)} alt="" />
                 </div>
-                <span style={{ fontSize:'13.5px', fontWeight:500 }}>{user.name.split(' ')[0]}</span>
+                <span style={{ fontSize:'13.5px', fontWeight:500 }}>{(user.name || user.firstName || 'You').split(' ')[0]}</span>
               </div>
             </>
           ) : (
