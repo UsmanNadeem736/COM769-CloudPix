@@ -19,10 +19,6 @@ jobs:
       contents: read
       packages: write
 
-    outputs:
-      api-tag:      ${{ steps.meta-api.outputs.version }}
-      frontend-tag: ${{ steps.meta-frontend.outputs.version }}
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -74,7 +70,7 @@ jobs:
           push: true
           tags: ${{ steps.meta-frontend.outputs.tags }}
           labels: ${{ steps.meta-frontend.outputs.labels }}
-          build-args: VITE_API_URL=${{ vars.VITE_API_URL }}
+          build-args: VITE_API_URL=${{ secrets.VITE_API_URL }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -89,25 +85,9 @@ jobs:
       - name: Deploy container to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
-          app-name: ${{ vars.AZURE_API_WEBAPP_NAME }}
+          app-name: ${{ secrets.AZURE_API_WEBAPP_NAME }}
           publish-profile: ${{ secrets.AZURE_API_PUBLISH_PROFILE }}
           images: ${{ env.API_IMAGE }}:latest
-
-      - name: Configure App Service environment variables
-        uses: azure/CLI@v2
-        with:
-          inlineScript: |
-            az webapp config appsettings set \
-              --name ${{ vars.AZURE_API_WEBAPP_NAME }} \
-              --resource-group ${{ vars.AZURE_RESOURCE_GROUP }} \
-              --settings \
-                MONGODB_URI="${{ secrets.MONGODB_URI }}" \
-                JWT_SECRET="${{ secrets.JWT_SECRET }}" \
-                AZURE_STORAGE_CONNECTION_STRING="${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}" \
-                AZURE_STORAGE_CONTAINER="photos" \
-                FRONTEND_URL="https://${{ vars.AZURE_FRONTEND_WEBAPP_NAME }}.azurewebsites.net" \
-                NODE_ENV="production" \
-                PORT="5000"
 
   # ── Deploy Frontend → Azure App Service ────────────────────
   deploy-frontend:
@@ -120,6 +100,6 @@ jobs:
       - name: Deploy container to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
-          app-name: ${{ vars.AZURE_FRONTEND_WEBAPP_NAME }}
+          app-name: ${{ secrets.AZURE_FRONTEND_WEBAPP_NAME }}
           publish-profile: ${{ secrets.AZURE_FRONTEND_PUBLISH_PROFILE }}
           images: ${{ env.FRONTEND_IMAGE }}:latest
