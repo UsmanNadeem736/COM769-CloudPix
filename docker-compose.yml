@@ -1,0 +1,45 @@
+version: '3.9'
+
+services:
+  # ── Backend API ─────────────────────────────────────────────
+  lumora-api:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: lumora-api
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      MONGODB_URI: ${MONGODB_URI}
+      JWT_SECRET: ${JWT_SECRET}
+      AZURE_STORAGE_CONNECTION_STRING: ${AZURE_STORAGE_CONNECTION_STRING:-}
+      AZURE_STORAGE_CONTAINER: ${AZURE_STORAGE_CONTAINER:-photos}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
+    ports:
+      - "5000:5000"
+    networks:
+      - lumora-net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── Frontend (nginx) ─────────────────────────────────────────
+  lumora-frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lumora-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - lumora-api
+    networks:
+      - lumora-net
+
+networks:
+  lumora-net:
+    driver: bridge
