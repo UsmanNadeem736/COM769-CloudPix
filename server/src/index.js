@@ -59,8 +59,13 @@ app.use((err, req, res, next) => {
 })
 
 // ── Start ────────────────────────────────────────────────────
-connectDB()
-  .then(() => app.listen(PORT, () => console.log(`Lumora API running on port ${PORT}`)))
-  .catch(err => { console.error('DB connection failed:', err); process.exit(1) })
+// In test mode supertest injects requests directly — no listen needed
+if (process.env.NODE_ENV !== 'test') {
+  connectDB()
+    .then(() => app.listen(PORT, () => console.log(`Lumora API running on port ${PORT}`)))
+    .catch(err => { console.error('DB connection failed:', err); process.exit(1) })
+} else {
+  connectDB().catch(err => console.error('DB connection failed:', err))
+}
 
 export default app
