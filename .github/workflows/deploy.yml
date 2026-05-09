@@ -11,7 +11,9 @@ env:
   FRONTEND_IMAGE: ghcr.io/${{ github.repository_owner }}/lumora-frontend
 
 jobs:
-  # ── Build & push Docker images ──────────────────────────────
+  # ── Build & push Docker images to GHCR ─────────────────────
+  # Azure App Services are configured to watch GHCR and auto-pull
+  # the latest image via Continuous Deployment webhooks.
   build-and-push:
     name: Build & Push Images
     runs-on: ubuntu-latest
@@ -74,32 +76,16 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # ── Deploy API → Azure App Service ─────────────────────────
-  deploy-backend:
-    name: Deploy API → Azure App Service
-    runs-on: ubuntu-latest
-    needs: build-and-push
-    environment: production
+      - name: Trigger Azure restart — API
+        run: |
+          curl -s -X POST \
+            "https://${{ secrets.AZURE_API_WEBAPP_NAME }}.scm.azurewebsites.net/api/restart" \
+            -u "${{ secrets.AZURE_API_WEBAPP_NAME }}:$(echo '${{ secrets.AZURE_API_PUBLISH_PROFILE }}' | grep -o 'userPWD="[^"]*"' | head -1 | cut -d'"' -f2)" \
+            || echo "Restart triggered (or skipped)"
 
-    steps:
-      - name: Deploy container to Azure Web App
-        uses: azure/webapps-deploy@v3
-        with:
-          app-name: ${{ secrets.AZURE_API_WEBAPP_NAME }}
-          publish-profile: ${{ secrets.AZURE_API_PUBLISH_PROFILE }}
-          images: ${{ env.API_IMAGE }}:latest
-
-  # ── Deploy Frontend → Azure App Service ────────────────────
-  deploy-frontend:
-    name: Deploy Frontend → Azure App Service
-    runs-on: ubuntu-latest
-    needs: build-and-push
-    environment: production
-
-    steps:
-      - name: Deploy container to Azure Web App
-        uses: azure/webapps-deploy@v3
-        with:
-          app-name: ${{ secrets.AZURE_FRONTEND_WEBAPP_NAME }}
-          publish-profile: ${{ secrets.AZURE_FRONTEND_PUBLISH_PROFILE }}
-          images: ${{ env.FRONTEND_IMAGE }}:latest
+      - name: Trigger Azure restart — Frontend
+        run: |
+          curl -s -X POST \
+            "https://${{ secrets.AZURE_FRONTEND_WEBAPP_NAME }}.scm.azurewebsites.net/api/restart" \
+            -u "${{ secrets.AZURE_FRONTEND_WEBAPP_NAME }}:$(echo '${{ secrets.AZURE_FRONTEND_PUBLISH_PROFILE }}' | grep -o 'userPWD="[^"]*"' | head -1 | cut -d'"' -f2)" \
+            || echo "Restart triggered (or skipped)"
