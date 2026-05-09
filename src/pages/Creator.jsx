@@ -3,6 +3,16 @@ import { useApp } from '../context/AppContext'
 import Nav from '../components/Nav'
 import UploadZone from '../components/UploadZone'
 import { picsum, fmtNum } from '../utils/helpers'
+import { photos as photosApi } from '../services/api'
+
+function timeAgo(dateStr) {
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  return `${Math.floor(hrs / 24)}d ago`
+}
 
 function useCountUp(target) {
   const [val, setVal] = useState(0)
@@ -38,13 +48,6 @@ function StatCard({ label, target, suffix='', sub, trend }) {
   )
 }
 
-const ACTIVITY = [
-  { icon:'♥', text:<><strong>Elena V.</strong> liked <strong>Golden Hour Reflections</strong></>, time:'2h ago' },
-  { icon:'💬', text:<><strong>Marcus T.</strong> commented on <strong>Desert Dunes</strong></>, time:'3h ago' },
-  { icon:'★',  text:<><strong>Sara J.</strong> rated <strong>Kyoto in Bloom</strong> 5 stars</>, time:'1d ago' },
-  { icon:'♥', text:<><strong>Raj P.</strong> liked <strong>Urban Geometry</strong></>, time:'1d ago' },
-]
-const GEO = [['United Kingdom','38%'],['United States','24%'],['Germany','14%'],['Japan','9%'],['France','7%'],['Other','8%']]
 
 export default function Creator() {
   const { user, fetchPhotos, createPhoto, deletePhoto, addToast, logout } = useApp()
@@ -56,8 +59,11 @@ export default function Creator() {
   const [captionLen, setCaptionLen] = useState(0)
   const [publishing, setPublishing] = useState(false)
   const [imageFile,  setImageFile]  = useState(null)
-  const [myPhotos,   setMyPhotos]   = useState([])
-  const [loadingPhotos, setLoadingPhotos] = useState(false)
+  const [myPhotos,       setMyPhotos]       = useState([])
+  const [loadingPhotos,  setLoadingPhotos]  = useState(false)
+  const [stats,          setStats]          = useState(null)
+  const [activity,       setActivity]       = useState([])
+  const [loadingActivity,setLoadingActivity]= useState(false)
   const formRef = useRef(null)
 
   const loadMyPhotos = async () => {
@@ -73,7 +79,18 @@ export default function Creator() {
   }
 
   useEffect(() => {
+    photosApi.myStats().then(setStats).catch(() => {})
+  }, [])
+
+  useEffect(() => {
     if (section === 'gallery') loadMyPhotos()
+    if (section === 'activity') {
+      setLoadingActivity(true)
+      photosApi.myActivity()
+        .then(data => setActivity(data.activity))
+        .catch(() => addToast('Failed to load activity', 'error'))
+        .finally(() => setLoadingActivity(false))
+    }
   }, [section])
 
   const handlePublish = async (e) => {
@@ -169,10 +186,10 @@ export default function Creator() {
                 </div>
               </div>
               <div className="stat-cards">
-                <StatCard label="Total Photos"  target={myPhotos.length || 0} sub="published" />
-                <StatCard label="Total Views"   target={82400} sub="this week" trend="+1.2K" />
-                <StatCard label="Total Likes"   target={9341}  sub="this week" trend="+214" />
-                <StatCard label="Avg. Rating"   target={0} suffix="4.8★" sub="across all photos" />
+                <StatCard label="Total Photos"   target={stats?.totalPhotos   ?? 0} sub="published" />
+                <StatCard label="Total Likes"    target={stats?.totalLikes    ?? 0} sub="across all photos" />
+                <StatCard label="Total Comments" target={stats?.totalComments ?? 0} sub="across all photos" />
+                <StatCard label="Avg. Rating"    target={0} suffix={stats ? `${stats.avgRating}★` : '—'} sub="from ratings" />
               </div>
 
               <div style={{ background:'var(--surface)', borderRadius:'var(--r4)', border:'1px solid var(--border-2)', boxShadow:'var(--s1)', overflow:'hidden' }}>
@@ -285,30 +302,33 @@ export default function Creator() {
           {section === 'analytics' && (
             <div>
               <div className="creator-header">
-                <div className="creator-header-left"><h1>Analytics</h1><p>Understand your audience</p></div>
+                <div className="creator-header-left"><h1>Analytics</h1><p>Your real-time stats from MongoDB</p></div>
               </div>
               <div className="stat-cards">
-                <StatCard label="Views (30d)"    target={24800} sub="vs last month" trend="+18%" />
-                <StatCard label="Likes (30d)"    target={3120}  sub="vs last month" trend="+24%" />
-                <StatCard label="Comments (30d)" target={418}   sub="vs last month" trend="+11%" />
-                <StatCard label="Followers"      target={1892}  sub="this week"     trend="+47" />
+                <StatCard label="Total Photos"   target={stats?.totalPhotos   ?? 0} sub="published" />
+                <StatCard label="Total Likes"    target={stats?.totalLikes    ?? 0} sub="across all photos" />
+                <StatCard label="Total Comments" target={stats?.totalComments ?? 0} sub="across all photos" />
+                <StatCard label="Avg. Rating"    target={0} suffix={stats ? `${stats.avgRating}★` : '—'} sub="from ratings" />
               </div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:20, marginTop:24 }}>
-                <div style={{ background:'var(--surface)', borderRadius:'var(--r3)', border:'1px solid var(--border-2)', boxShadow:'var(--s1)', overflow:'hidden' }}>
-                  <div style={{ padding:'14px 20px', borderBottom:'1px solid var(--border-2)', fontWeight:600, fontSize:14 }}>Audience Geography</div>
-                  <div style={{ padding:'16px 20px', display:'flex', flexDirection:'column', gap:10 }}>
-                    {GEO.map(([country, pct]) => (
-                      <div key={country} style={{ display:'flex', alignItems:'center', gap:10 }}>
-                        <span style={{ fontSize:'13.5px', flex:1 }}>{country}</span>
-                        <div style={{ flex:2, height:6, background:'var(--border)', borderRadius:'var(--rf)', overflow:'hidden' }}>
-                          <div style={{ height:'100%', width:pct, background:'var(--gold-grad)', borderRadius:'var(--rf)' }} />
-                        </div>
-                        <span style={{ fontSize:12, color:'var(--text-3)', width:36, textAlign:'right' }}>{pct}</span>
+              {stats?.topPhotos?.length > 0 && (
+                <div style={{ marginTop:24, background:'var(--surface)', borderRadius:'var(--r3)', border:'1px solid var(--border-2)', boxShadow:'var(--s1)', overflow:'hidden' }}>
+                  <div style={{ padding:'14px 20px', borderBottom:'1px solid var(--border-2)', fontWeight:600, fontSize:14 }}>Top Photos by Likes</div>
+                  <div style={{ padding:'0 20px' }}>
+                    {stats.topPhotos.map((p, i) => (
+                      <div key={p._id} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 0', borderBottom: i < stats.topPhotos.length-1 ? '1px solid var(--border-2)' : 'none' }}>
+                        <span style={{ width:24, fontWeight:700, fontSize:13, color:'var(--text-3)' }}>#{i+1}</span>
+                        <span style={{ flex:1, fontSize:'13.5px' }}>{p.title}</span>
+                        <span style={{ fontSize:13, color:'var(--gold-dark)' }}>♥ {p.likesCount}</span>
                       </div>
                     ))}
                   </div>
                 </div>
-              </div>
+              )}
+              {stats?.totalPhotos === 0 && (
+                <div style={{ marginTop:24, padding:40, textAlign:'center', color:'var(--text-3)' }}>
+                  No photos yet. Upload your first photo to see analytics!
+                </div>
+              )}
             </div>
           )}
 
@@ -316,15 +336,26 @@ export default function Creator() {
           {section === 'activity' && (
             <div>
               <div className="creator-header">
-                <div className="creator-header-left"><h1>Activity</h1><p>Likes, comments, and follows</p></div>
+                <div className="creator-header-left"><h1>Activity</h1><p>Recent comments on your photos</p></div>
               </div>
               <div style={{ background:'var(--surface)', borderRadius:'var(--r3)', border:'1px solid var(--border-2)', boxShadow:'var(--s1)' }}>
                 <div style={{ padding:'16px 20px' }}>
-                  {ACTIVITY.map((a, i) => (
-                    <div key={i} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 0', borderBottom: i < ACTIVITY.length-1 ? '1px solid var(--border-2)' : 'none' }}>
-                      <div style={{ width:36, height:36, borderRadius:'var(--rf)', background:'var(--gold-pale)', color:'var(--gold-dark)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:16, flexShrink:0 }}>{a.icon}</div>
-                      <div style={{ flex:1, fontSize:'13.5px', lineHeight:1.5 }}>{a.text}</div>
-                      <div style={{ fontSize:12, color:'var(--text-3)' }}>{a.time}</div>
+                  {loadingActivity ? (
+                    <div style={{ padding:40, textAlign:'center', color:'var(--text-3)' }}>Loading activity…</div>
+                  ) : activity.length === 0 ? (
+                    <div style={{ padding:40, textAlign:'center', color:'var(--text-3)' }}>No activity yet. Share your photos to get engagement!</div>
+                  ) : activity.map((a, i) => (
+                    <div key={i} style={{ display:'flex', alignItems:'flex-start', gap:12, padding:'12px 0', borderBottom: i < activity.length-1 ? '1px solid var(--border-2)' : 'none' }}>
+                      <div style={{ width:36, height:36, borderRadius:'var(--rf)', background:'var(--gold-pale)', color:'var(--gold-dark)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:16, flexShrink:0 }}>💬</div>
+                      <div style={{ flex:1 }}>
+                        <div style={{ fontSize:'13.5px', lineHeight:1.5 }}>
+                          <strong>{a.user}</strong> commented on <strong>{a.photoTitle}</strong>
+                        </div>
+                        <div style={{ fontSize:12, color:'var(--text-3)', marginTop:2 }}>
+                          "{a.text.length > 100 ? a.text.slice(0, 100) + '…' : a.text}"
+                        </div>
+                      </div>
+                      <div style={{ fontSize:12, color:'var(--text-3)', flexShrink:0 }}>{timeAgo(a.createdAt)}</div>
                     </div>
                   ))}
                 </div>

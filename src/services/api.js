@@ -69,6 +69,9 @@ export const photos = {
 
   // Per-photo coalescing: safe to call from multiple components on the same page
   myRating: (id) => coalesceRequest(`photos:${id}:myRating`, () => request(`/photos/${id}/my-rating`)),
+
+  myStats:    () => request('/photos/my/stats'),
+  myActivity: () => request('/photos/my/activity'),
 }
 
 // ── Comments ─────────────────────────────────────────────────

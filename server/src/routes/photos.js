@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { body, query, validationResult } from 'express-validator'
 import Photo from '../models/Photo.js'
+import Comment from '../models/Comment.js'
 import { requireAuth, requireRole } from '../middleware/auth.js'
 import { multerMemory, uploadToAzure, deleteFromAzure } from '../middleware/upload.js'
 
@@ -51,6 +52,59 @@ router.get('/', [
 
     res.set('Cache-Control', 'public, max-age=30')
     res.json({ photos, total, page, pages: Math.ceil(total / limit) })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// GET /api/photos/my/stats  — aggregate analytics for authenticated creator
+router.get('/my/stats', requireAuth, requireRole('creator'), async (req, res) => {
+  try {
+    const myPhotos = await Photo.find({ creator: req.user._id })
+      .select('title likes ratings')
+      .lean({ virtuals: true })
+
+    const photoIds     = myPhotos.map(p => p._id)
+    const totalLikes   = myPhotos.reduce((sum, p) => sum + p.likes.length, 0)
+    const allRatings   = myPhotos.flatMap(p => p.ratings.map(r => r.value))
+    const avgRating    = allRatings.length
+      ? Math.round((allRatings.reduce((s, v) => s + v, 0) / allRatings.length) * 10) / 10
+      : 0
+    const totalComments = await Comment.countDocuments({ photo: { $in: photoIds } })
+    const topPhotos = [...myPhotos]
+      .sort((a, b) => b.likes.length - a.likes.length)
+      .slice(0, 5)
+      .map(p => ({ _id: p._id, title: p.title, likesCount: p.likes.length }))
+
+    res.json({ totalPhotos: myPhotos.length, totalLikes, totalComments, avgRating, topPhotos })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// GET /api/photos/my/activity  — recent comments on creator's photos
+router.get('/my/activity', requireAuth, requireRole('creator'), async (req, res) => {
+  try {
+    const myPhotos = await Photo.find({ creator: req.user._id }).select('_id title').lean()
+    const photoIds = myPhotos.map(p => p._id)
+    const photoMap = Object.fromEntries(myPhotos.map(p => [p._id.toString(), p.title]))
+
+    const recentComments = await Comment.find({ photo: { $in: photoIds } })
+      .populate('author', 'firstName lastName handle')
+      .sort({ createdAt: -1 })
+      .limit(20)
+      .lean()
+
+    const activity = recentComments.map(c => ({
+      type: 'comment',
+      user: `${c.author.firstName} ${c.author.lastName}`,
+      handle: c.author.handle,
+      photoTitle: photoMap[c.photo.toString()] || 'a photo',
+      text: c.text,
+      createdAt: c.createdAt,
+    }))
+
+    res.json({ activity })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
