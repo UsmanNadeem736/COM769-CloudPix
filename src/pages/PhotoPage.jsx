@@ -32,6 +32,9 @@ export default function PhotoPage() {
         if (cancelled) return
         setPhoto(p)
         setLikesCount(p.likesCount || p.likes?.length || 0)
+        if (user && Array.isArray(p.likes)) {
+          setLiked(p.likes.map(String).includes(String(user.id || user._id)))
+        }
         document.title = `Lumora — ${p.title}`
       })
       .catch(() => setNotFound(true))

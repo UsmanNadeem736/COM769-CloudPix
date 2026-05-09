@@ -27,6 +27,9 @@ export default function PhotoModal({ photoId, onClose }) {
       if (cancelled) return
       setPhoto(p)
       setLikesCount(p.likesCount || p.likes?.length || 0)
+      if (user && Array.isArray(p.likes)) {
+        setLiked(p.likes.map(String).includes(String(user.id || user._id)))
+      }
     }).catch(() => addToast('Failed to load photo', 'error'))
 
     fetchComments(photoId).then(({ comments }) => {
