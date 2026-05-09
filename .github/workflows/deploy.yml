@@ -66,7 +66,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Build & push frontend image
+      - name: Build & push Frontend image
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -78,7 +78,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # ── Deploy Backend to Azure App Service ────────────────────
+  # ── Deploy API → Azure App Service ─────────────────────────
   deploy-backend:
     name: Deploy API → Azure App Service
     runs-on: ubuntu-latest
@@ -86,59 +86,40 @@ jobs:
     environment: production
 
     steps:
-      - name: Deploy to Azure Web App (container)
+      - name: Deploy container to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
-          app-name: ${{ vars.AZURE_WEBAPP_NAME }}
-          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          app-name: ${{ vars.AZURE_API_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_API_PUBLISH_PROFILE }}
           images: ${{ env.API_IMAGE }}:latest
 
-      - name: Set App Service environment variables
+      - name: Configure App Service environment variables
         uses: azure/CLI@v2
         with:
           inlineScript: |
             az webapp config appsettings set \
-              --name ${{ vars.AZURE_WEBAPP_NAME }} \
+              --name ${{ vars.AZURE_API_WEBAPP_NAME }} \
               --resource-group ${{ vars.AZURE_RESOURCE_GROUP }} \
               --settings \
                 MONGODB_URI="${{ secrets.MONGODB_URI }}" \
                 JWT_SECRET="${{ secrets.JWT_SECRET }}" \
                 AZURE_STORAGE_CONNECTION_STRING="${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}" \
                 AZURE_STORAGE_CONTAINER="photos" \
-                FRONTEND_URL="${{ vars.AZURE_STATIC_WEB_APP_URL }}" \
+                FRONTEND_URL="https://${{ vars.AZURE_FRONTEND_WEBAPP_NAME }}.azurewebsites.net" \
                 NODE_ENV="production" \
                 PORT="5000"
 
-  # ── Deploy Frontend to Azure Static Web Apps ────────────────
+  # ── Deploy Frontend → Azure App Service ────────────────────
   deploy-frontend:
-    name: Deploy Frontend → Azure Static Web Apps
+    name: Deploy Frontend → Azure App Service
     runs-on: ubuntu-latest
     needs: build-and-push
     environment: production
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Deploy container to Azure Web App
+        uses: azure/webapps-deploy@v3
         with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Install & Build
-        run: |
-          npm ci
-          npm run build
-        env:
-          VITE_API_URL: ${{ vars.VITE_API_URL }}
-
-      - name: Deploy to Azure Static Web Apps
-        uses: Azure/static-web-apps-deploy@v1
-        with:
-          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          action: upload
-          app_location: /
-          output_location: dist
-          skip_app_build: true
+          app-name: ${{ vars.AZURE_FRONTEND_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_FRONTEND_PUBLISH_PROFILE }}
+          images: ${{ env.FRONTEND_IMAGE }}:latest
