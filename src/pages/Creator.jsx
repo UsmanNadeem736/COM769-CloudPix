@@ -42,7 +42,7 @@ function StatCard({ label, target, suffix='', sub, trend }) {
   return (
     <div ref={ref} className="stat-card">
       <div className="stat-card-label">{label}</div>
-      <div className="stat-card-value">{target ? fmt(val) : suffix}</div>
+      <div className="stat-card-value">{suffix !== '' ? suffix : fmt(val)}</div>
       <div className="stat-card-sub">{trend && <span className="trend-up">{trend} </span>}{sub}</div>
     </div>
   )
@@ -81,7 +81,9 @@ export default function Creator() {
   }
 
   useEffect(() => {
-    photosApi.myStats().then(setStats).catch(() => {})
+    photosApi.myStats()
+      .then(setStats)
+      .catch(() => setStats({ totalPhotos:0, totalLikes:0, totalComments:0, avgRating:0, topPhotos:[] }))
   }, [])
 
   useEffect(() => {
