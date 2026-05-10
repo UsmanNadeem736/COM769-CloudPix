@@ -34,7 +34,7 @@ router.post('/', requireAuth, [
     const photo = await Photo.findById(req.params.photoId)
     if (!photo) return res.status(404).json({ error: 'Photo not found' })
 
-    const { score, label } = analyzeSentiment(req.body.text)
+    const { score, label } = await analyzeSentiment(req.body.text)
 
     const comment = await Comment.create({
       photo:          photo._id,
