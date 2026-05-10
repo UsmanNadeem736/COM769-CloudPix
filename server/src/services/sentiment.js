@@ -15,7 +15,7 @@ export async function analyzeSentiment(text) {
 
   try {
     const url = `${endpoint.replace(/\/$/, '')}/text/analytics/v3.1/sentiment`;
-    
+    console.log(`Calling Azure AI: ${url}`);
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -28,11 +28,13 @@ export async function analyzeSentiment(text) {
     });
 
     if (!response.ok) {
-      console.error('Azure AI API Error:', response.statusText);
+      const errBody = await response.json().catch(() => ({}));
+      console.error('Azure AI API Error:', response.status, response.statusText, JSON.stringify(errBody));
       return { score: 0, label: 'neutral' };
     }
 
     const data = await response.json();
+    console.log('Azure AI Response:', JSON.stringify(data));
     const label = data.documents[0]?.sentiment || 'neutral';
     
     // Map Azure labels to scores for your database
