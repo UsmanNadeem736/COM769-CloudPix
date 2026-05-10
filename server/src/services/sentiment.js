@@ -1,6 +1,6 @@
 /**
  * Azure AI Sentiment Analysis Service
- * Replaces the local 'sentiment' library with Cloud-based NLP
+ * Uses the latest 2023-04-01 Language API
  */
 
 export async function analyzeSentiment(text) {
@@ -14,8 +14,9 @@ export async function analyzeSentiment(text) {
   }
 
   try {
-    const url = `${endpoint.replace(/\/$/, '')}/text/analytics/v3.1/sentiment`;
-    console.log(`Calling Azure AI: ${url}`);
+    // Modern 2023 Language API URL
+    const url = `${endpoint.replace(/\/$/, '')}/language/:analyze-text?api-version=2023-04-01`;
+    
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -23,25 +24,40 @@ export async function analyzeSentiment(text) {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        documents: [{ id: '1', text: text }]
+        "kind": "SentimentAnalysis",
+        "parameters": {
+          "modelVersion": "latest"
+        },
+        "analysisInput": {
+          "documents": [
+            {
+              "id": "1",
+              "language": "en",
+              "text": text
+            }
+          ]
+        }
       })
     });
 
+    const data = await response.json();
+
     if (!response.ok) {
-      const errBody = await response.json().catch(() => ({}));
-      console.error('Azure AI API Error:', response.status, response.statusText, JSON.stringify(errBody));
+      console.error('--- AZURE AI ERROR ---');
+      console.error('Status:', response.status);
+      console.error('Response:', JSON.stringify(data));
       return { score: 0, label: 'neutral' };
     }
 
-    const data = await response.json();
-    console.log('Azure AI Response:', JSON.stringify(data));
-    const label = data.documents[0]?.sentiment || 'neutral';
+    // Extracting sentiment from the new 2023 response structure
+    const sentimentResult = data.results?.documents[0];
+    const label = sentimentResult?.sentiment || 'neutral';
     
     // Map Azure labels to scores for your database
     const scoreMap = { 'positive': 3, 'neutral': 0, 'negative': -3 };
     const score = scoreMap[label] || 0;
 
-    console.log(`Azure AI Analysis for "${text}": ${label}`);
+    console.log(`Azure AI Analysis (2023 API) for "${text}": ${label}`);
     return { score, label };
   } catch (error) {
     console.error('Azure AI Connection Error:', error.message);
